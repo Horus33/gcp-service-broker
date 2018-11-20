@@ -226,6 +226,14 @@
   version = "v1.0.0"
 
 [[projects]]
+  branch = "master"
+  digest = "1:3e16737937a6a460b7bc43946ecc96524173afefa6ce2bd5d4e43f1f7e121527"
+  name = "github.com/omeid/go-resources"
+  packages = ["."]
+  pruneopts = ""
+  revision = "ca9993b7d1a4f98a6f2f07e465538721ee3a8682"
+
+[[projects]]
   digest = "1:b04597acc9d90336e9409114e4e85f03cf253574a70c5c5c61450422e4911f10"
   name = "github.com/onsi/ginkgo"
   packages = [
@@ -592,6 +600,7 @@
     "github.com/hashicorp/hil/ast",
     "github.com/jinzhu/gorm",
     "github.com/jinzhu/gorm/dialects/sqlite",
+    "github.com/omeid/go-resources",
     "github.com/onsi/ginkgo",
     "github.com/onsi/gomega",
     "github.com/pivotal-cf/brokerapi",

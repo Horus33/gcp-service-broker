@@ -17,7 +17,6 @@ package cmd
 import (
 	"context"
 	"net/http"
-	"os"
 
 	"code.cloudfoundry.org/lager"
 	"github.com/GoogleCloudPlatform/gcp-service-broker/brokerapi/brokers"
@@ -25,6 +24,7 @@ import (
 	"github.com/GoogleCloudPlatform/gcp-service-broker/db_service"
 	"github.com/GoogleCloudPlatform/gcp-service-broker/pkg/compatibility"
 	"github.com/GoogleCloudPlatform/gcp-service-broker/pkg/toggles"
+	"github.com/GoogleCloudPlatform/gcp-service-broker/utils"
 	"github.com/pivotal-cf/brokerapi"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -58,11 +58,7 @@ func init() {
 }
 
 func serve() {
-
-	logger := lager.NewLogger("gcp-service-broker")
-	logger.RegisterSink(lager.NewWriterSink(os.Stderr, lager.ERROR))
-	logger.RegisterSink(lager.NewWriterSink(os.Stdout, lager.DEBUG))
-
+	logger := utils.Logger("gcp-service-broker")
 	models.ProductionizeUserAgent()
 
 	db_service.New(logger)

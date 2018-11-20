@@ -64,3 +64,11 @@
 [[constraint]]
   name = "gopkg.in/go-playground/validator.v9"
   version = "9.22.0"
+
+[[constraint]]
+  name = "github.com/gobuffalo/packr"
+  version = "1.21.3"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/omeid/go-resources"
