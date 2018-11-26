@@ -17,34 +17,61 @@
 package main
 
 import (
-	"flag"
+	"archive/zip"
+	"bytes"
 	"fmt"
+	"io"
+	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
-
-	resources "github.com/omeid/go-resources"
+	"strings"
 )
 
 func main() {
-	pathPtr := flag.String("path", "", "The path of the directory to pack up")
-	varPtr := flag.String("var", "", "The name of the variable for this package")
-
-	flag.Parse()
-
-	if pathPtr == nil || varPtr == nil {
-		log.Fatalf("Expected path and var to be filled.")
+	if len(os.Args) != 4 {
+		log.Fatalf("Usage: %s packagedest packagename dirtozip", os.Args[0])
 	}
 
-	compilePackage(*varPtr, "assets", *pathPtr)
+	packageDest := os.Args[1]
+	packageName := os.Args[2]
+	dirToZip := os.Args[3]
+
+	// create package
+	pkgRoot := filepath.Join(packageDest, packageName)
+	os.RemoveAll(pkgRoot)
+	if err := os.MkdirAll(pkgRoot, os.ModeDir|0777); err != nil {
+		log.Fatalf("couldn't create package %q, %v", pkgRoot, err)
+	}
+
+	// zip directory up in it
+	// zipFile := filepath.Join(pkgRoot, "packed.zip")
+	// defer os.Remove(zipFile)
+	buf, err := zipDirectory(dirToZip, pkgRoot)
+	if err != nil {
+		log.Fatalf("couldn't create zip from %q %v", dirToZip, err)
+	}
+
+	chunkCount, err := writeChunks(pkgRoot, packageName, buf)
+	if err != nil {
+		log.Fatalf("couldn't create %d chunks %v", chunkCount, err)
+	}
+
+	// create index file
+
+	// create chunks
+
 }
 
-func compilePackage(varname, pkgName, dir string) {
-	pkg := resources.New()
-	pkg.Config.Pkg = pkgName
-	pkg.Config.Var = varname
-	pkg.Config.Format = false
-	pkg.Config.Declare = true
+func zipDirectory(dir, to string) (*bytes.Buffer, error) {
+	f := new(bytes.Buffer)
+	// f, err := os.Create(to)
+	// if err != nil {
+	// 	return err
+	// }
+	// defer f.Close()
+	zipWriter := zip.NewWriter(f)
+	defer zipWriter.Close()
 
 	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -55,18 +82,126 @@ func compilePackage(varname, pkgName, dir string) {
 			return nil
 		}
 
-		if err := pkg.AddFile(path[len(dir):], path); err != nil {
+		zipPath := strings.Join(filepath.SplitList(path[len(dir)+1:]), "/")
+		log.Printf("Packing %q as %q\n", path, zipPath)
+		writer, err := zipWriter.Create(zipPath)
+		if err != nil {
 			return err
 		}
 
-		fmt.Printf("added file: %q\n", path)
-		return nil
+		return readFile(path, writer)
 	})
 
 	if err != nil {
-		fmt.Printf("%v\n", err)
+		return f, err
 	}
-	fmt.Println("writing output")
 
-	pkg.Write(varname + ".go")
+	return f, nil
 }
+
+func readFile(src string, dest io.Writer) error {
+	fd, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer fd.Close()
+
+	_, err = io.Copy(dest, fd)
+	return err
+}
+
+// writeChunks divides the buffer up into portions and writes them under
+// the given directory. It returns the number of chunks written as well as an
+// error if it was encountered.
+func writeChunks(dir, packageName string, buf *bytes.Buffer) (int, error) {
+	count := 0
+	for {
+		chunk := buf.Next(1024 * 1024)
+		if len(chunk) == 0 {
+			return count, nil
+		}
+		chunkid := filepath.Join(dir, fmt.Sprintf("chunk%d.go", count))
+		contents := fmt.Sprintf("package %s\n\nvar embedded%d = %#v\n", packageName, count, chunk)
+		err := ioutil.WriteFile(chunkid, []byte(contents), 0644)
+		if err != nil {
+			return count, err
+		}
+		count += 1
+	}
+}
+
+var indexTemplate = `
+package chunked
+
+import (
+	"archive/zip"
+	"bytes"
+	"io"
+)
+
+func NewZipReader() (*zip.Reader, error) {
+	fd := File{
+		embedded0,
+	}
+
+	return zip.NewReader(fd, fd.Length())
+}
+
+type chunk []byte
+type File []chunk
+
+func (f File) ReadAt(p []byte, off int64) (n int, err error) {
+	iOff := int(off)
+	slice := f.slice(iOff, iOff+len(p))
+
+	for i, b := range slice {
+		p[i] = b
+	}
+
+	n = len(slice)
+	if n < len(p) {
+		err = io.EOF
+	}
+
+	return
+}
+
+func (f File) Length() int64 {
+	l := 0
+	for _, chunk := range f {
+		l += len(chunk)
+	}
+	return int64(l)
+}
+
+func (f File) slice(start, end int) []byte {
+	buf := new(bytes.Buffer)
+
+	chunkStart := 0
+	for _, chunk := range f {
+		chunkEnd := chunkStart + len(chunk)
+
+		overlapStart := imin(chunkEnd, imax(chunkStart, start))
+		overlapEnd := imax(chunkStart, imin(chunkEnd, end))
+
+		buf.Write(chunk[overlapStart:overlapEnd])
+		chunkStart = chunkEnd
+	}
+
+	return buf.Bytes()
+}
+
+func imax(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
+}
+
+func imin(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+``

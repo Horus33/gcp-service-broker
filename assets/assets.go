@@ -16,12 +16,9 @@ package assets
 //go:generate go run unzip.go --src "terraform-google-beta-linux-amd64.zip" --dest "terraform-linux-386/providers"
 //go:generate go run unzip.go --src "terraform-google-beta-linux-386.zip" --dest "terraform-linux-amd64/providers"
 
-//go:generate go run pack.go --var terraformLinux386 --path terraform-linux-386
-//go:generate go run pack.go --var terraformLinuxAmd64 --path terraform-linux-amd64
-//go:generate go run pack.go --var terraformSources --path terraform-sources
+//go:generate go run pack.go . tflinux386 terraform-linux-386
+//go:generate go run pack.go . tflinuxamd64 terraform-linux-amd64
+//go:generate go run pack.go . tfsources terraform-sources
 
 func DumpSources(outputDirectory string) {
-	for fn, fd := range terraformSources.files {
-
-	}
 }
