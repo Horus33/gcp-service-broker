@@ -1,2 +1,0 @@
-is this is test.txt?
-no, this is patrick!
