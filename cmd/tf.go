@@ -22,6 +22,7 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"github.com/GoogleCloudPlatform/gcp-service-broker/assets"
 	"github.com/GoogleCloudPlatform/gcp-service-broker/brokerapi/brokers/models"
 	"github.com/GoogleCloudPlatform/gcp-service-broker/db_service"
 	"github.com/GoogleCloudPlatform/gcp-service-broker/pkg/providers/tf"
@@ -99,6 +100,28 @@ func init() {
 				fmt.Fprintf(w, "%q\t%s\t%s\t%s\t%q\n", result.ID, result.LastOperationType, result.LastOperationState, lastUpdate, result.LastOperationMessage)
 			}
 			w.Flush()
+		},
+	})
+
+	tfCmd.AddCommand(&cobra.Command{
+		Use:   "sources",
+		Short: "Extract the Terraform sources into the current directory",
+		Run: func(cmd *cobra.Command, args []string) {
+			log.Println("Extracting to: ./gcp-service-broker-tf-sources")
+			if err := assets.DumpSources("gcp-service-broker-tf-sources"); err != nil {
+				log.Fatal(err)
+			}
+		},
+	})
+
+	tfCmd.AddCommand(&cobra.Command{
+		Use:   "extract",
+		Short: "Extract the Terraform binaries for the current os/arch into the current directory",
+		Run: func(cmd *cobra.Command, args []string) {
+			log.Println("Extracting to: ./tf-binaries")
+			if err := assets.ExtractTerraform("tf-binaries"); err != nil {
+				log.Fatal(err)
+			}
 		},
 	})
 }

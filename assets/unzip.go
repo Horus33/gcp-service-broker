@@ -20,11 +20,10 @@ import (
 	"archive/zip"
 	"flag"
 	"fmt"
-	"io"
 	"log"
 	"os"
-	"path/filepath"
-	"strings"
+
+	"github.com/GoogleCloudPlatform/gcp-service-broker/utils"
 )
 
 func main() {
@@ -47,41 +46,9 @@ func main() {
 	}
 	defer zipReader.Close()
 
-	for _, f := range zipReader.File {
-		path := filepath.Clean(filepath.Join(dest, f.Name))
-		if !strings.HasPrefix(path, dest) {
-			log.Fatalf("Error while unzipping: %v\n", fmt.Errorf("Possible vulnerability extracting %q", f.Name))
-		}
-
-		if f.FileInfo().IsDir() {
-			if err := os.MkdirAll(path, os.ModePerm); err != nil {
-				log.Fatalf("Error while unzipping: %v\n", err)
-			}
-		} else {
-			contents, err := f.Open()
-			if err != nil {
-				log.Fatalf("Error while unzipping: %v\n", err)
-			}
-			if err := writeFile(contents, path, f.Mode()); err != nil {
-				log.Fatalf("Error while unzipping: %v\n", err)
-			}
-		}
+	if err := utils.Unzip(&zipReader.Reader, dest); err != nil {
+		log.Fatalf("Error while unzipping: %v\n", err)
 	}
 
-}
-
-func writeFile(src io.ReadCloser, dest string, perm os.FileMode) error {
-	defer src.Close()
-	if err := os.MkdirAll(filepath.Dir(dest), os.ModePerm); err != nil {
-		return err
-	}
-
-	out, err := os.OpenFile(dest, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, perm)
-	if err != nil {
-		return err
-	}
-	defer out.Close()
-
-	_, err = io.Copy(out, src)
-	return err
+	os.Remove(src)
 }
