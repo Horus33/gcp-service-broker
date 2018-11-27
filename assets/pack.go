@@ -48,13 +48,14 @@ const header = `// Copyright 2018 the Service Broker Project Authors.
 `
 
 func main() {
-	if len(os.Args) != 4 {
-		log.Fatalf("Usage: %s packagedest package-name dir-to-zip", os.Args[0])
+	if len(os.Args) != 5 {
+		log.Fatalf("Usage: %s packagedest package-name dir-to-zip build-tags", os.Args[0])
 	}
 
 	packageDest := os.Args[1]
 	packageName := os.Args[2]
 	dirToZip := os.Args[3]
+	tags := os.Args[4]
 
 	// create package
 	pkgRoot := filepath.Join(packageDest, packageName)
@@ -74,14 +75,14 @@ func main() {
 
 	// create chunks
 	log.Println("Creating chunks...")
-	chunkCount, err := writeChunks(pkgRoot, packageName, buf)
+	chunkCount, err := writeChunks(pkgRoot, packageName, buf, tags)
 	if err != nil {
 		log.Fatalf("couldn't create %d chunks %v\n", chunkCount, err)
 	}
 
 	// create index file
 	log.Println("Creating chunk index...")
-	if err := writeIndex(pkgRoot, packageName, chunkCount); err != nil {
+	if err := writeIndex(pkgRoot, packageName, chunkCount, tags); err != nil {
 		log.Fatalf("couldn't create index %v\n", err)
 	}
 
@@ -133,7 +134,7 @@ func readFile(src string, dest io.Writer) error {
 // writeChunks divides the buffer up into portions and writes them under
 // the given directory. It returns the number of chunks written as well as an
 // error if it was encountered.
-func writeChunks(dir, packageName string, buf *bytes.Buffer) (int, error) {
+func writeChunks(dir, packageName string, buf *bytes.Buffer, tags string) (int, error) {
 	count := 0
 	for {
 		chunk := buf.Next(128 * 1024)
@@ -142,7 +143,7 @@ func writeChunks(dir, packageName string, buf *bytes.Buffer) (int, error) {
 		}
 		chunkid := filepath.Join(dir, fmt.Sprintf("chunk%d.go", count))
 		log.Printf("Writing chunk %d with %d bytes to %q\n", count, len(chunk), chunkid)
-		contents := fmt.Sprintf("package %s\n\nvar chunk%d = %#v\n", packageName, count, chunk)
+		contents := fmt.Sprintf("\n// +build %s\n\npackage %s\n\nvar chunk%d = %#v\n", tags, packageName, count, chunk)
 
 		if err := ioutil.WriteFile(chunkid, []byte(header+contents), 0644); err != nil {
 			return count, err
@@ -151,7 +152,7 @@ func writeChunks(dir, packageName string, buf *bytes.Buffer) (int, error) {
 	}
 }
 
-func writeIndex(dir, packageName string, chunkCount int) error {
+func writeIndex(dir, packageName string, chunkCount int, tags string) error {
 	var chunks []string
 	for i := 0; i < chunkCount; i++ {
 		chunks = append(chunks, fmt.Sprintf("chunk%d", i))
@@ -165,6 +166,7 @@ func writeIndex(dir, packageName string, chunkCount int) error {
 		"chunks":  chunks,
 		"header":  header,
 		"package": packageName,
+		"tags":    tags,
 	}); err != nil {
 		return err
 	}
@@ -180,6 +182,9 @@ func writeIndex(dir, packageName string, chunkCount int) error {
 
 var indexTemplate = `
 {{.header}}
+
+// +build {{.tags}}
+
 package {{.package}}
 
 import (
